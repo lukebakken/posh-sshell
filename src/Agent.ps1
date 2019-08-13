@@ -9,7 +9,7 @@ function Get-SshAgent() {
         return $native
     }
     else {
-        $agentPid = $Env:SSH_AGENT_PID
+        $agentPid = $Env:SSH_AGENT_PID_WIN32
         if ($agentPid) {
             $sshAgentProcess = Get-Process | Where-Object { ($_.Id -eq $agentPid) -and ($_.Name -eq 'ssh-agent') }
             if ($null -ne $sshAgentProcess) {
@@ -17,6 +17,7 @@ function Get-SshAgent() {
             }
             else {
                 setenv 'SSH_AGENT_PID' $null
+                setenv 'SSH_AGENT_PID_WIN32' $null
                 setenv 'SSH_AUTH_SOCK' $null
             }
         }
@@ -104,9 +105,20 @@ function Start-SshAgent {
         }
 
         & $sshAgent | ForEach-Object {
+            Write-Host "ssh-agent output line: $_"
             if ($_ -match '(?<key>[^=]+)=(?<value>[^;]+);') {
-                setenv $Matches['key'] $Matches['value'] $Scope
+                $key = $Matches['key']
+                $value = $Matches['value']
+                setenv $key $value $Scope
+                if ($Scope -eq 'User') {
+                    setenv $key $value 'Process'
+                }
             }
+        }
+
+        setenv 'SSH_AGENT_PID_WIN32' $sshAgentProcess.Id $Scope
+        if ($Scope -eq 'User') {
+            setenv 'SSH_AGENT_PID_WIN32' $sshAgentProcess.Id 'Process'
         }
     }
 
@@ -130,6 +142,7 @@ function Stop-SshAgent() {
         }
 
         setenv 'SSH_AGENT_PID' $null
+        setenv 'SSH_AGENT_PID_WIN32' $null
         setenv 'SSH_AUTH_SOCK' $null
     }
 }
